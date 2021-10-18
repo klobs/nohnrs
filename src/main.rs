@@ -1,5 +1,3 @@
-use std::io::{stdout, Write};
-use std::str::from_utf8;
 use json;
 use std::time::{Duration, Instant};
 use std::convert::Infallible;
@@ -21,12 +19,7 @@ struct NewsItem {
 }
 
 async fn handle(_req: Request<Body>, news: Arc<Mutex<Vec<NewsItem>>>) -> Result<Response<Body>, Infallible> {
-    
-    println!("TEST1");
-    let lock = news.lock().unwrap();
-    println!("TEST2");
-    
-    Ok(Response::new(Body::from(format!("{:?}",*lock))))
+    Ok(Response::new(Body::from(format!("{:?}",*news.lock().unwrap()))))
 }
 
 #[tokio::main]
@@ -46,12 +39,12 @@ async fn main() {
         }
     });
 
-    let join_handle = tokio::spawn(async move {
+    let _join_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(5*60)).await;
             let news3 = news2.clone();
             let new_news = spawn_blocking(move || {
-                let mut news_guard = news3.lock().unwrap();
+                let news_guard = news3.lock().unwrap();
                 update_news(&*news_guard)
             }).await.unwrap();
             let mut news_guard = news2.lock().unwrap();
@@ -75,7 +68,7 @@ fn update_news(old_news : &[NewsItem]) -> Vec<NewsItem> {
     
     
 
-  let mut list: Vec<u32> = body.json().unwrap();
+  let list: Vec<u32> = body.json().unwrap();
     
     let mut newslist = Vec::with_capacity(NEWSITEMS);
     
