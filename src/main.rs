@@ -19,19 +19,14 @@ struct NewsItem {
     score: u32,
     seen: Instant,
 }
-/*
-fn main() {
-  let mut news = Vec::new();
-  
-  loop {
-    news = update_news(&news[..]);
-    std::thread::sleep(std::time::Duration::from_secs(5));
-    println!("{:?}", news);
-  }
-}*/
 
 async fn handle(_req: Request<Body>, news: Arc<Mutex<Vec<NewsItem>>>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::from(format!("{:?}",*news.lock().unwrap()))))
+    
+    println!("TEST1");
+    let lock = news.lock().unwrap();
+    println!("TEST2");
+    
+    Ok(Response::new(Body::from(format!("{:?}",*lock))))
 }
 
 #[tokio::main]
@@ -53,7 +48,7 @@ async fn main() {
 
     let join_handle = tokio::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(5*60));
+            tokio::time::sleep(Duration::from_secs(5*60)).await;
             let news3 = news2.clone();
             let new_news = spawn_blocking(move || {
                 let mut news_guard = news3.lock().unwrap();
@@ -110,3 +105,4 @@ fn update_news(old_news : &[NewsItem]) -> Vec<NewsItem> {
   
   newslist
 }
+
