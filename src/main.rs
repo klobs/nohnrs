@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::task::spawn_blocking;
 
-const NEWSITEMS: usize = 30;
+const NEWSITEMS: usize = 5;
+const HOTSCORE: u32 = 250;
 
 #[derive(Debug)]
 struct NewsItem {
@@ -22,12 +23,37 @@ async fn handle(
     _req: Request<Body>,
     news: Arc<Mutex<Vec<NewsItem>>>,
 ) -> Result<Response<Body>, Infallible> {
+
+    let mut newsitems: String = "".to_owned();
+
+    for newsitem in &*news.lock().unwrap() {
+
+        let mut newsclass: String = "".to_string();
+
+        if newsitem.score >= HOTSCORE {
+            newsclass.push_str("hot");
+        }
+
+        if let Some(url) = &newsitem.url {
+            newsitems.push_str(&format!("<li class='{}'><a href='{}'>{}</a></li>", newsclass, url, newsitem.title));
+        }
+        else {
+            newsitems.push_str(&format!("<li class='{}'>{}</li>", newsclass, newsitem.title));
+        }
+
+        println!("item {:#?}", newsitem);
+
+    }
+
     Ok(Response::new(Body::from(format!(
         "<body>
+                <style>
+                    .hot {{ background-color: yellow;}}
+                </style>
                 <h1>No old hacker news</h1>
-                <ul><li>{:?}</li></ul>
+                <ol>{}</ol>
         </body>",
-        *news.lock().unwrap()
+        newsitems
     ))))
 }
 
@@ -37,6 +63,8 @@ async fn main() {
         spawn_blocking(|| update_news(&[])).await.unwrap(),
     ));
     let news2 = news.clone();
+
+    println!("Serving on 127.0.0.1:8000");
 
     // Construct our SocketAddr to listen on...
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
@@ -75,6 +103,8 @@ async fn main() {
 }
 
 fn update_news(old_news: &[NewsItem]) -> Vec<NewsItem> {
+    println!("Populating...");
+
     let body = reqwest::blocking::get(
         "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty",
     )
