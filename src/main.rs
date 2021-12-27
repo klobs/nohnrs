@@ -1,3 +1,4 @@
+//use hyper::header::{Headers, SetCookie};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use json;
@@ -19,6 +20,13 @@ struct NewsItem {
     seen: Instant,
 }
 
+fn get_classes(newsItem: &NewsItem) -> String {
+        if newsItem.score >= HOTSCORE {
+            return "hot".to_string();
+        }
+	return "".to_string();
+}
+
 async fn handle(
     _req: Request<Body>,
     news: Arc<Mutex<Vec<NewsItem>>>,
@@ -28,17 +36,13 @@ async fn handle(
 
     for newsitem in &*news.lock().unwrap() {
 
-        let mut newsclass: String = "".to_string();
-
-        if newsitem.score >= HOTSCORE {
-            newsclass.push_str("hot");
-        }
+        let mut newsclass: String = get_classes(newsitem);
 
         if let Some(url) = &newsitem.url {
-            newsitems.push_str(&format!("<li class='{}'><a href='{}'>{}</a></li>", newsclass, url, newsitem.title));
+            newsitems.push_str(&format!("<li class='{}'><a href='{}'>{}</a><br>({} Points)</li>", newsclass, url, newsitem.title, newsitem.score));
         }
         else {
-            newsitems.push_str(&format!("<li class='{}'>{}</li>", newsclass, newsitem.title));
+            newsitems.push_str(&format!("<li class='{}'><a href='https://news.ycombinator.com/item?id={}'>{}</a><br>({} Points)</li>", newsclass, newsitem.id, newsitem.title, newsitem.score));
         }
 
         println!("item {:#?}", newsitem);
