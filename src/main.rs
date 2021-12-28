@@ -1,15 +1,18 @@
-//use hyper::header::{Headers, SetCookie};
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+use hyper::{Body, Request, Response, Server, header, StatusCode};
 use json;
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
+use std::str::FromStr;
 use tokio::task::spawn_blocking;
+use regex::Regex;
 
-const NEWSITEMS: usize = 5;
+const NEWSITEMS: usize = 30;
 const HOTSCORE: u32 = 250;
+
+type GenericError = Box<dyn std::error::Error + Send + Sync>;
+type Result<T> = std::result::Result<T, GenericError>;
 
 #[derive(Debug)]
 struct NewsItem {
@@ -17,26 +20,58 @@ struct NewsItem {
     title: String,
     url: Option<String>,
     score: u32,
-    seen: Instant,
+    seen: Duration,
 }
 
-fn get_classes(newsItem: &NewsItem) -> String {
-        if newsItem.score >= HOTSCORE {
-            return "hot".to_string();
+fn get_classes(news_item: &NewsItem, seen: &Option<Duration>) -> String {
+    let mut class_string: String = "".to_owned();
+        if news_item.score >= HOTSCORE {
+            class_string.push_str("hot");
         }
-	return "".to_string();
+        if let Some(s) = seen {
+            if class_string.len() != 0 {
+                class_string.push_str(" ");
+            }
+
+            if news_item.seen.as_secs() < s.as_secs() {
+                class_string.push_str("old");
+            } else {
+                class_string.push_str("new");
+            }
+        }
+	class_string
+}
+
+fn get_seen_from_cookies(req: &Request<Body>) -> Option<Duration>{
+	if req.headers().contains_key(header::COOKIE){
+        let re = Regex::new(r".*visit=(\d+).*").unwrap();
+        let caps = re.captures(req.headers().get(header::COOKIE).unwrap().to_str().unwrap());
+        if let Some(c) = caps {
+            let last_visit = c.get(1).unwrap().as_str();
+            // here, i would not like to use unwrap but use Result, 
+            // but i didnt manage it, as the Generic Error is defined above and 
+            // compiler complains
+            let last_visit2: u64 = FromStr::from_str(last_visit).unwrap();
+            println!("Last visit: {}", last_visit2); 
+            return Some(Duration::new(last_visit2, 0));
+        }
+		return None;
+	}
+	None
 }
 
 async fn handle(
-    _req: Request<Body>,
+    req: Request<Body>,
     news: Arc<Mutex<Vec<NewsItem>>>,
-) -> Result<Response<Body>, Infallible> {
+) -> Result<Response<Body>> {
 
     let mut newsitems: String = "".to_owned();
 
+    let seen = get_seen_from_cookies(&req);
+
     for newsitem in &*news.lock().unwrap() {
 
-        let mut newsclass: String = get_classes(newsitem);
+        let newsclass: String = get_classes(newsitem, &seen);
 
         if let Some(url) = &newsitem.url {
             newsitems.push_str(&format!("<li class='{}'><a href='{}'>{}</a><br>({} Points)</li>", newsclass, url, newsitem.title, newsitem.score));
@@ -45,20 +80,30 @@ async fn handle(
             newsitems.push_str(&format!("<li class='{}'><a href='https://news.ycombinator.com/item?id={}'>{}</a><br>({} Points)</li>", newsclass, newsitem.id, newsitem.title, newsitem.score));
         }
 
-        println!("item {:#?}", newsitem);
+        //println!("item {:#?}", newsitem);
 
     }
 
-    Ok(Response::new(Body::from(format!(
-        "<body>
-                <style>
-                    .hot {{ background-color: yellow;}}
-                </style>
-                <h1>No old hacker news</h1>
-                <ol>{}</ol>
-        </body>",
-        newsitems
-    ))))
+    let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
+
+    let response = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::SET_COOKIE, format!("visit={}", timestamp.unwrap().as_secs()))
+                    .header(header::CONTENT_TYPE, "text/html")
+                    .body(Body::from(format!(
+                        "<!doctype html>
+                         <html><meta charset=\"utf-8\">
+                                <style>
+                                    ol:nth-child(odd) {{ background-color: light-blue; }}
+
+                                    .old {{ opacity: 0.33; }}
+                                    .hot {{ background-color: yellow; opacity: 1;}}
+                                </style>
+                                <h1>No old hacker news</h1>
+                                <ol>{}</ol>
+                        </html>", newsitems)))?;
+
+    Ok(response)
 }
 
 #[tokio::main]
@@ -78,7 +123,7 @@ async fn main() {
         let news2 = news.clone();
         async move {
             let news3 = news2.clone();
-            Ok::<_, Infallible>(service_fn(move |req| handle(req, news3.clone())))
+            Ok::<_, GenericError>(service_fn(move |req| handle(req, news3.clone())))
         }
     });
 
@@ -139,7 +184,7 @@ fn update_news(old_news: &[NewsItem]) -> Vec<NewsItem> {
                 .get("url")
                 .map(|u| u.as_str().unwrap().to_owned()),
             score: entry_json_obj["score"].as_u32().unwrap(),
-            seen: Instant::now(),
+            seen: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap(),
         };
 
         for x in old_news {
