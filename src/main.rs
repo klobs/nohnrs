@@ -88,13 +88,13 @@ async fn handle(
 
     let response = Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::SET_COOKIE, format!("visit={}", timestamp.unwrap().as_secs()))
+                    .header(header::SET_COOKIE, format!("visit={}; SameSite=Strict; Max-Age=86400;", timestamp.unwrap().as_secs()))
                     .header(header::CONTENT_TYPE, "text/html")
                     .body(Body::from(format!(
                         "<!doctype html>
                          <html><meta charset=\"utf-8\">
                                 <style>
-                                    ol:nth-child(odd) {{ background-color: light-blue; }}
+                                    li:nth-child(even) {{ background-color: #F0FFF0;}}
 
                                     .old {{ opacity: 0.33; }}
                                     .hot {{ background-color: yellow; opacity: 1;}}

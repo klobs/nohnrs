@@ -10,5 +10,6 @@ edition = "2018"
 json = "0.12.4"
 reqwest = {version = "0.11.4", features = ["json","blocking"]}
 hyper = {version = "*", features = ["server"]}
-tokio = {version = "*", features = ["full"]}
+#tokio = {version = "*", features = ["full"]}
+tokio = {version = "*", features=["net", "process", "macros"]}
 regex = {version = "*"}
