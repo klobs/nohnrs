@@ -28,7 +28,7 @@ fn get_classes(news_item: &NewsItem, seen: &Option<Duration>) -> String {
         class_string.push_str("hot");
     }
     if let Some(s) = seen {
-        if class_string.is_empty() {
+        if !class_string.is_empty() {
             class_string.push(' ');
         }
 
@@ -96,7 +96,6 @@ async fn handle(req: Request<Body>, news: Arc<Mutex<Vec<NewsItem>>>) -> Result<R
                          <html><meta charset=\"utf-8\">
                                 <style>
                                     li:nth-child(even) {{ background-color: #F0FFF0;}}
-
                                     .old {{ opacity: 0.33; }}
                                     .hot {{ background-color: yellow; opacity: 1;}}
                                 </style>
