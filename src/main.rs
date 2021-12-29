@@ -1,6 +1,5 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{header, Body, Request, Response, Server, StatusCode};
-use json;
 use regex::Regex;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -29,8 +28,8 @@ fn get_classes(news_item: &NewsItem, seen: &Option<Duration>) -> String {
         class_string.push_str("hot");
     }
     if let Some(s) = seen {
-        if class_string.len() != 0 {
-            class_string.push_str(" ");
+        if class_string.is_empty() {
+            class_string.push(' ');
         }
 
         if news_item.seen.as_secs() < s.as_secs() {
