@@ -47,10 +47,7 @@ fn get_seen_from_cookies(req: &Request<Body>) -> Option<Duration> {
         let caps = re.captures(req.headers().get(header::COOKIE).unwrap().to_str().unwrap());
         if let Some(c) = caps {
             let last_visit = c.get(1).unwrap().as_str();
-            // here, i would not like to use unwrap but use Result,
-            // but i didnt manage it, as the Generic Error is defined above and
-            // compiler complains
-            let last_visit2: u64 = FromStr::from_str(last_visit).unwrap();
+            let last_visit2: u64 = FromStr::from_str(last_visit).ok()?;
             println!("Last visit: {}", last_visit2);
             return Some(Duration::new(last_visit2, 0));
         }
